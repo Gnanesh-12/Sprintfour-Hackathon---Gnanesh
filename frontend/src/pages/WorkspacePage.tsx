@@ -131,6 +131,8 @@ function WorkspaceContent({ analysisResult, originalFile }: { analysisResult: An
               title="Original"
               url={originalFileUrl}
               textContent={analysisResult.document}
+              spans={spans}
+              onSpanClick={handleSpanClick}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center bg-white/[0.02] border border-white/10 rounded-xl">
@@ -148,6 +150,8 @@ function WorkspaceContent({ analysisResult, originalFile }: { analysisResult: An
               url={redactedPreviewData.previewUrl}
               downloadUrl={redactedPreviewData.previewUrl}
               textContent={redactedPreviewData.redactedText}
+              spans={spans}
+              onSpanClick={handleSpanClick}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center bg-white/[0.02] border border-white/10 rounded-xl gap-3">

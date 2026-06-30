@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { motion } from 'framer-motion';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import type { Span } from '../types';
 
 // Setup worker from unpkg CDN — avoids local worker bundle issues
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -11,17 +12,14 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 interface PdfViewerProps {
   url: string | File;
   title: string;
+  spans?: Span[];
+  onSpanClick?: (span: Span) => void;
 }
 
 /**
  * PdfViewer — embeds a PDF using react-pdf / pdfjs.
- *
- * When `url` is a remote HTTP string (e.g. http://localhost:8000/exports/...)
- * we fetch it as an ArrayBuffer first so pdfjs gets the raw bytes instead of
- * making a cross-origin fetch itself (which can fail due to missing CORS
- * headers on FastAPI's StaticFiles mount).
  */
-export default function PdfViewer({ url, title }: PdfViewerProps) {
+export default function PdfViewer({ url, title, spans, onSpanClick }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
@@ -69,10 +67,95 @@ export default function PdfViewer({ url, title }: PdfViewerProps) {
     setPageNumber(1);
   }
 
-  const zoomIn  = () => setScale(s => Math.min(s + 0.2, 3.0));
+  const zoomIn = () => setScale(s => Math.min(s + 0.2, 3.0));
   const zoomOut = () => setScale(s => Math.max(s - 0.2, 0.5));
   const prevPage = () => setPageNumber(p => Math.max(p - 1, 1));
   const nextPage = () => setPageNumber(p => Math.min(p + 1, numPages || 1));
+
+  const textRenderer = useCallback(
+    ({ str, itemIndex }: { str: string; itemIndex: number }) => {
+      if (!spans || spans.length === 0 || !onSpanClick) return str;
+      if (typeof str !== 'string' || !str.trim()) return str;
+
+      let highlightedStr: (string | React.ReactNode)[] = [str];
+      const normStr = str.replace(/\s+/g, ' ').trim().toLowerCase();
+
+      // First check if any span is a substring of this str (the split logic)
+      spans.forEach((span) => {
+        if (!span.text) return;
+        const newHighlightedStr: (string | React.ReactNode)[] = [];
+
+        highlightedStr.forEach((part) => {
+          if (typeof part === 'string') {
+            const escapedSpan = span.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escapedSpan})`, 'gi');
+            const pieces = part.split(regex);
+
+            if (pieces.length > 1) {
+              pieces.forEach((piece) => {
+                if (piece.toLowerCase() === span.text.toLowerCase()) {
+                  newHighlightedStr.push(
+                    <mark
+                      key={`${span.id}-${itemIndex}-${Math.random()}`}
+                      className="bg-conseal-primary/30 text-transparent cursor-pointer relative z-10 hover:bg-conseal-primary/50 transition-colors pointer-events-auto rounded-[2px]"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSpanClick(span);
+                      }}
+                      title={`Click to view details for ${span.type}`}
+                      style={{ color: 'transparent' }}
+                    >
+                      {piece}
+                    </mark>
+                  );
+                } else if (piece) {
+                  newHighlightedStr.push(piece);
+                }
+              });
+            } else {
+              newHighlightedStr.push(part);
+            }
+          } else {
+            newHighlightedStr.push(part);
+          }
+        });
+        highlightedStr = newHighlightedStr;
+      });
+
+      // If we didn't split anything (meaning no span was fully inside this str),
+      // let's check if this str is a chunk OF a span.
+      if (highlightedStr.length === 1 && typeof highlightedStr[0] === 'string') {
+        if (normStr.length >= 3) {
+          const matchedSpan = spans.find(span => {
+            if (!span.text) return false;
+            const normSpan = span.text.replace(/\s+/g, ' ').trim().toLowerCase();
+            return normSpan.includes(normStr) || normStr.includes(normSpan);
+          });
+          if (matchedSpan) {
+            return (
+              <mark
+                className="bg-conseal-primary/30 text-transparent cursor-pointer relative z-10 hover:bg-conseal-primary/50 transition-colors pointer-events-auto rounded-[2px]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onSpanClick(matchedSpan);
+                }}
+                title={`Click to view details for ${matchedSpan.type}`}
+                style={{ color: 'transparent' }}
+              >
+                {str}
+              </mark>
+            );
+          }
+        }
+      }
+
+      // Instead of a fragment, use a span. Some versions of react-pdf clone the result or expect a true element.
+      return <span className="react-pdf-text-highlight-wrapper">{highlightedStr}</span>;
+    },
+    [spans, onSpanClick]
+  );
 
   return (
     <div className="flex flex-col h-full bg-white/[0.02] border border-white/10 rounded-xl overflow-hidden shadow-xl">
@@ -126,8 +209,9 @@ export default function PdfViewer({ url, title }: PdfViewerProps) {
                 pageNumber={pageNumber}
                 scale={scale}
                 className="shadow-2xl"
-                renderTextLayer={false}
+                renderTextLayer={true}
                 renderAnnotationLayer={false}
+                customTextRenderer={textRenderer as any}
               />
             )}
           </Document>

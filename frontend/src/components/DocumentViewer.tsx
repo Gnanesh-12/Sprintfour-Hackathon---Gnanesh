@@ -1,6 +1,7 @@
 import { Download, FileText } from "lucide-react";
 import PdfViewer from "./PdfViewer";
 import { AnimatedButton } from "./ui/AnimatedButton";
+import type { Span } from "../types";
 
 interface DocumentViewerProps {
   fileType: string;
@@ -8,6 +9,8 @@ interface DocumentViewerProps {
   url?: string | File | null;
   textContent?: string;
   downloadUrl?: string;
+  spans?: Span[];
+  onSpanClick?: (span: Span) => void;
 }
 
 export default function DocumentViewer({
@@ -16,6 +19,8 @@ export default function DocumentViewer({
   url,
   textContent,
   downloadUrl,
+  spans,
+  onSpanClick,
 }: DocumentViewerProps) {
   if (fileType === "pdf") {
     if (!url) {
@@ -25,8 +30,48 @@ export default function DocumentViewer({
         </div>
       );
     }
-    return <PdfViewer url={url} title={title} />;
+    return <PdfViewer url={url} title={title} spans={spans} onSpanClick={onSpanClick} />;
   }
+
+  const renderTextContent = () => {
+    if (!textContent) return <div className="flex items-center justify-center h-full text-white/40 text-sm">Loading text...</div>;
+    if (!spans || spans.length === 0 || !onSpanClick) return <pre className="text-white/80 whitespace-pre-wrap font-mono text-sm leading-relaxed">{textContent}</pre>;
+
+    let highlightedStr: (string | React.ReactNode)[] = [textContent];
+    spans.forEach((span) => {
+      if (!span.text) return;
+      const newHighlightedStr: (string | React.ReactNode)[] = [];
+      highlightedStr.forEach((part) => {
+        if (typeof part === 'string') {
+          const pieces = part.split(span.text);
+          pieces.forEach((piece, i) => {
+            newHighlightedStr.push(piece);
+            if (i < pieces.length - 1) {
+              newHighlightedStr.push(
+                <mark
+                  key={`${span.id}-${i}`}
+                  className="bg-conseal-primary/30 text-white cursor-pointer relative z-10 hover:bg-conseal-primary/50 transition-colors pointer-events-auto rounded-[2px]"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSpanClick(span);
+                  }}
+                  title={`Click to view details for ${span.type}`}
+                >
+                  {span.text}
+                </mark>
+              );
+            }
+          });
+        } else {
+          newHighlightedStr.push(part);
+        }
+      });
+      highlightedStr = newHighlightedStr;
+    });
+
+    return <pre className="text-white/80 whitespace-pre-wrap font-mono text-sm leading-relaxed">{highlightedStr}</pre>;
+  };
 
   if (fileType === "txt") {
     return (
@@ -35,15 +80,7 @@ export default function DocumentViewer({
           <h3 className="text-xs font-bold text-white/50 uppercase tracking-widest">{title} (TXT)</h3>
         </div>
         <div className="flex-1 overflow-auto p-6 bg-[#1a1a1a]">
-          {textContent ? (
-            <pre className="text-white/80 whitespace-pre-wrap font-mono text-sm leading-relaxed">
-              {textContent}
-            </pre>
-          ) : (
-             <div className="flex items-center justify-center h-full text-white/40 text-sm">
-               Loading text...
-             </div>
-          )}
+          {renderTextContent()}
         </div>
       </div>
     );

@@ -62,7 +62,10 @@ class PdfExporter(BaseExporter):
                 if not span.text:
                     continue
                     
-                escaped_span = re.escape(span.text.strip())
+                # Normalize all whitespace (including newlines) to a single space
+                # because `full_text` is built from space-separated words without newlines.
+                normalized_text = re.sub(r'\s+', ' ', span.text.strip())
+                escaped_span = re.escape(normalized_text)
                 pattern = escaped_span.replace(r'\ ', r'\s+')
                 
                 try:
@@ -72,7 +75,7 @@ class PdfExporter(BaseExporter):
                     matches = []
                 
                 if not matches:
-                    start_idx = full_text.find(span.text)
+                    start_idx = full_text.find(normalized_text)
                     if start_idx != -1:
                         class SimpleMatch:
                             def __init__(self, start, end):
@@ -80,7 +83,7 @@ class PdfExporter(BaseExporter):
                                 self._end = end
                             def start(self): return self._start
                             def end(self): return self._end
-                        matches = [SimpleMatch(start_idx, start_idx + len(span.text))]
+                        matches = [SimpleMatch(start_idx, start_idx + len(normalized_text))]
                 
                 if not matches:
                     logger.warning(f"Text not found: {span.text}")
