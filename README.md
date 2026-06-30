@@ -1,76 +1,112 @@
 # Conseal Trust Center
 
-**Explain • Verify • Challenge**
+**"Trust Every Redaction."**
 
-A Trust Center application designed for the Conseal Hackathon (Problem Statement 1 – Trust & Explainability). This project deliberately focuses on **trust rather than detection**. It doesn't just visually mask data; it explains the reasoning, mechanically verifies removal, and admits uncertainty so the user can make informed decisions.
+Conseal Trust Center is an enterprise-grade document redaction platform designed to solve the "black-box AI" problem in data privacy. Instead of simply redacting a document and expecting users to blindly trust the result, Conseal is built around absolute transparency, explainability, and mathematical verification.
 
-## Architecture & Tech Stack
+![Conseal Workspace Preview](https://via.placeholder.com/1000x500.png?text=Conseal+Trust+Center+Workspace)
 
-```text
-React Frontend (Vite, TS, Tailwind v4)
-        │
-        ▼
-FastAPI Backend (Python)
-        │
-        ▼
-Detection Service (Microsoft Presidio)
-        │
-        ▼
-Rationale Engine (Deterministic Mapping)
-        │
-        ▼
-Verification Service (Mechanical check)
-        │
-        ▼
-Frontend
+---
+
+## 🎯 The Core Philosophy
+
+When sharing sensitive documents with AI or third parties, users need to answer four fundamental questions. Every feature in the Conseal Trust Center is designed to answer one of these:
+
+1. **Why was this redacted?** (Explainability)
+2. **Why wasn't this redacted?** (Near Misses)
+3. **Can I prove it is actually removed?** (Mechanical Verification)
+4. **Can I change the decision?** (Human-in-the-Loop Overrides)
+
+---
+
+## ✨ Key Features
+
+* **Intelligent PII Detection**: Powered by Microsoft Presidio, the engine detects Names, Phones, Emails, Addresses, SSNs, Dates, and Organizations with high accuracy.
+* **Explainable AI Rationales**: Every single detection comes with a plain-text rationale explaining exactly *why* the AI made its decision.
+* **Near Miss Detection**: The AI explains what it decided *not* to redact (e.g., public organizations or dates), ensuring nothing was accidentally missed.
+* **Human-in-the-Loop (HITL) Overrides**: Users have full control. You can override any AI decision, switch redactions on/off, and provide a human reason for the audit log (e.g., "False Positive", "Intentional Disclosure").
+* **Mathematical Verification**: Before a document can be exported, the system runs a strict string-matching algorithm against the newly generated file to mathematically guarantee that the redacted PII strings no longer exist anywhere in the document text.
+* **Multi-Format Support**: Upload, preview, and natively redact **PDF**, **DOCX**, and **TXT** files.
+  * *Note: PDFs are permanently redacted by mathematically intersecting black boxes with the text layer, physically stripping the underlying characters.*
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+* **Framework**: React 18, Vite, TypeScript
+* **Styling**: Tailwind CSS (custom glassmorphism, enterprise UI design)
+* **Animations**: Framer Motion (premium micro-interactions, staggered checklists)
+* **Document Rendering**: `react-pdf` (pdf.js)
+
+### Backend
+* **Framework**: FastAPI (Python)
+* **NLP / AI Engine**: Microsoft Presidio (`AnalyzerEngine`, spaCy)
+* **Document Processing**: `PyMuPDF` (fitz) for PDFs, `python-docx` for Word documents.
+* **Architecture**: Stateless, in-memory processing. No user documents are persisted in a database, ensuring strict data privacy.
+
+---
+
+## 🚀 Setup & Installation
+
+### Prerequisites
+* Python 3.9+
+* Node.js 18+
+* npm or yarn
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/Gnanesh-12/Sprintfour-Hackathon---Gnanesh.git
+cd Sprintfour-Hackathon---Gnanesh
 ```
 
-## Features Implemented (As per Requirements)
-
-1. **Document Viewer**: Polished UI with inline span highlighting.
-2. **Explanation Panel**: Side panel detailing original text, type, confidence, plain-language rationale, and risk level.
-3. **Near-Miss Toggle (Signature Feature)**: Toggle to reveal entities the system considered but *deliberately chose not to redact*, explaining *why* they remained visible.
-4. **Verification Panel**: Three-stage pipeline visualizing the original, processed, and exported document. Includes a mechanical check verifying that `span.text not in exported_document`.
-5. **Review Queue**: Surfaces uncertain decisions (confidence < 0.70) for human review and challenge.
-
-## Philosophy & Design Decisions
-
-- **Deterministic Rationale (Presidio over LLM)**: Every explanation is traceable to a specific recognizer or rule instead of model-generated reasoning. This prevents hallucinations in the explanation layer.
-- **Verification > Masking**: We do not rely on visual masking on the frontend. The backend actively verifies the exact string match is no longer present in the payload.
-- **Admitting Uncertainty**: By surfacing lower-confidence detections in the Review Queue, we admit uncertainty instead of pretending the system is perfect, building trust through honesty.
-- **Curated Overrides**: To demonstrate contextual reasoning without requiring an LLM, a set of curated overrides is built into the seed data (e.g. "Sherlock Holmes" -> nearMiss, "Apple Inc." -> nearMiss).
-
-## Deliberately Not Implemented
-
-As per the hackathon spec, the following items were intentionally deferred to maximize the quality and completeness of the core explainability features within time constraints:
-
-- Trust Dashboard & Trust Ledger
-- Privacy Certificate
-- Authentication & Database
-- Batch processing & Multi-document support
-- Cloud LLM contextual reasoning
-
-## Setup & Running
-
-### Requirements
-- Python 3.9+
-- Node.js 18+
-
-### Install Dependencies
+### 2. Backend Setup
+Navigate to the backend directory and install dependencies:
 ```bash
-npm run install:all
-# Or run manually:
-# cd backend && pip install -r requirements.txt
-# cd frontend && npm install
+cd backend
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+# source venv/bin/activate
+
+pip install -r requirements.txt
+python -m spacy download en_core_web_lg
+```
+Start the FastAPI server:
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Run the App
+### 3. Frontend Setup
+Open a new terminal, navigate to the frontend directory, and install dependencies:
 ```bash
-# Starts both frontend and backend concurrently
+cd frontend
+npm install
+```
+Start the Vite development server:
+```bash
 npm run dev
 ```
 
-* Backend runs on http://localhost:8000
-* Frontend runs on http://localhost:5173
+### 4. Access the Application
+Open your browser and navigate to `http://localhost:5173`.
 
-Once started, use the **"Load Sample Document"** button in the app to populate the editor with the seed document, which contains curated examples demonstrating all PII types and Near-Miss entities.
+---
+
+## 📖 How It Works (The Workflow)
+
+1. **Upload**: Drag and drop your PDF, DOCX, or TXT file into the secure upload zone.
+2. **Analysis Pipeline**: The backend extracts the raw text and runs it through the Presidio NLP engine. Entities are scored based on confidence. High-confidence items are auto-redacted; low-confidence items are flagged for manual review.
+3. **Workspace Review**: You are taken to the dual-pane Workspace. On the left, the original document. On the right, a live preview of the redactions. 
+4. **Inspect & Override**: Use the right-hand panel to inspect the "Trust Summary". Click on any "Needs Review" or "Near Miss" entity to read the AI's rationale. If you disagree, click "Override Decision".
+5. **Verify & Export**: Once satisfied, proceed to Verification. The system will mathematically prove the PII is gone. If the checks pass, you can securely download the final document.
+
+---
+
+## 🔒 Security & Privacy
+The Conseal Trust Center operates entirely locally. It does not send your documents to external cloud LLMs (like OpenAI or Anthropic). All NLP processing happens locally via spaCy and Presidio, and files are processed strictly in-memory or in temporary directories that are immediately cleaned up. No databases are used to store your sensitive data.
+
+---
+
+*Built with ❤️ for privacy and explainable AI.*
