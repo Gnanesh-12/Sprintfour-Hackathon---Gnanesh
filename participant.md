@@ -1,2 +1,0 @@
-Full Name : KHANDAVILLI V V S D GNANESH
-Roll Number : CB.SC.U4CSE23662
